@@ -1,0 +1,19 @@
+streamer_settings:
+  source: "videos/video__7.mp4"
+  display_window_name: BACKGROUND RECONSTRUCTION
+  enable_save: True
+
+background_subtractor_settings:
+  device: "cuda:0"
+  number_of_samples: 30
+  matching_threshold: 10
+  matching_number: 2
+  update_factor: 1
+  neighborhood_radius: 1
+  median_filter_kernel_size: 3
+  morphological_opening_structuring_element_size: 7
+
+background_reconstructor_settings:
+  age_threshold: 20
+  background_change_ratio: 0.02
+  foreground_change_ratio: 0.01

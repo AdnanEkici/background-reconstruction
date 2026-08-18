@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Start",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "app/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--configuration_file_path",
+                "configuration_files/configuration_1.yml"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Record Video For Labelling",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "app/misc/data_recorder.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--configuration_file_path",
+                "configuration_files/configuration_1_recording.yml"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+    ]
+}
