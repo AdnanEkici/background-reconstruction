@@ -1475,6 +1475,3 @@ The result is a background reconstruction pipeline that combines **sample-based 
 
 
 ![alt text](assets/example_output_3.gif)
-
-
-

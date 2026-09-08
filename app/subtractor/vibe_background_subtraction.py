@@ -128,21 +128,16 @@ class ViBe:
         )
 
         # Buffers with random values
-        self.__update_mask: torch.Tensor = (
-            torch.empty(self.__width * self.__height, dtype=torch.float).uniform_(0, 1).to(self.__device)
-        )
+        self.__update_mask: torch.Tensor = torch.empty(self.__width * self.__height, dtype=torch.float).uniform_(0, 1).to(self.__device)
         self.__neighbor_row: torch.Tensor | None = None
         self.__neighbor_col: torch.Tensor | None = None
         self.__position: torch.Tensor | None = None
 
         # Some other precomputations
-        self.__row: torch.Tensor = (
-            torch.arange(0, self.__height, dtype=torch.float, device=self.__device)
-            .repeat(self.__width, 1)
-            .transpose(0, 1)
-        )
+        self.__row: torch.Tensor = torch.arange(0, self.__height, dtype=torch.float, device=self.__device).repeat(self.__width, 1).transpose(0, 1)
         self.__col: torch.Tensor = torch.arange(0, self.__width, dtype=torch.float, device=self.__device).repeat(
-            self.__height, 1
+            self.__height,
+            1,
         )
 
         # Threshold values
@@ -168,19 +163,13 @@ class ViBe:
         amount: int = int(torch.sum(self.__update_mask).to(self.CPU).numpy())
 
         self.__neighbor_row: torch.Tensor = (
-            torch.randint(-self.__neighborhood_radius, self.__neighborhood_radius + 1, (amount,))
-            .to(self.__device)
-            .type(torch.float)
+            torch.randint(-self.__neighborhood_radius, self.__neighborhood_radius + 1, (amount,)).to(self.__device).type(torch.float)
         )
         self.__neighbor_col: torch.Tensor = (
-            torch.randint(-self.__neighborhood_radius, self.__neighborhood_radius + 1, (amount,))
-            .to(self.__device)
-            .type(torch.float)
+            torch.randint(-self.__neighborhood_radius, self.__neighborhood_radius + 1, (amount,)).to(self.__device).type(torch.float)
         )
 
-        self.__position: torch.Tensor = (
-            torch.randint(0, self.__number_of_samples, (amount,)).to(self.__device).type(torch.float)
-        )
+        self.__position: torch.Tensor = torch.randint(0, self.__number_of_samples, (amount,)).to(self.__device).type(torch.float)
 
     def __apply_morphological_close(self, mask: np.ndarray) -> np.ndarray:
         """Apply morphological opening and closing to clean the binary mask.
@@ -196,7 +185,8 @@ class ViBe:
             Cleaned binary mask after opening and closing.
         """
         kernel: np.ndarray = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, self.__morphological_opening_structuring_element_size
+            cv2.MORPH_ELLIPSE,
+            self.__morphological_opening_structuring_element_size,
         )
         mask_cleaned: np.ndarray = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask_cleaned = cv2.morphologyEx(mask_cleaned, cv2.MORPH_CLOSE, kernel)
@@ -259,12 +249,17 @@ class ViBe:
             pos: torch.Tensor = self.__position[0:num_updates]
 
             self.__history_buffer[
-                :, row.type(torch.LongTensor), col.type(torch.LongTensor), pos.type(torch.LongTensor)
+                :,
+                row.type(torch.LongTensor),
+                col.type(torch.LongTensor),
+                pos.type(torch.LongTensor),
             ] = frame[:, row.type(torch.LongTensor), col.type(torch.LongTensor)]
 
             row_shift: torch.Tensor = row + self.__neighbor_row[0:num_updates]
             row_shift = torch.where(
-                row_shift >= self.__height, self.__one[0:num_updates] * self.__height - 1, row_shift
+                row_shift >= self.__height,
+                self.__one[0:num_updates] * self.__height - 1,
+                row_shift,
             )
             row_shift = torch.where(row_shift < 0, self.__zero[0:num_updates], row_shift)
 
@@ -275,7 +270,10 @@ class ViBe:
             pos = self.__roll(self.__position, r2[0])[0:num_updates]
 
             self.__history_buffer[
-                :, row_shift.type(torch.LongTensor), col_shift.type(torch.LongTensor), pos.type(torch.LongTensor)
+                :,
+                row_shift.type(torch.LongTensor),
+                col_shift.type(torch.LongTensor),
+                pos.type(torch.LongTensor),
             ] = frame[:, row.type(torch.LongTensor), col.type(torch.LongTensor)]
 
     def __roll(self, x: torch.Tensor, n: int) -> torch.Tensor:

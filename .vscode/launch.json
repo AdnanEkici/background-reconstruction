@@ -10,22 +10,7 @@
             "justMyCode": false,
             "args": [
                 "--configuration_file_path",
-                "configuration_files/configuration_1.yml"
-            ],
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Record Video For Labelling",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "app/misc/data_recorder.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "--configuration_file_path",
-                "configuration_files/configuration_1_recording.yml"
+                "configuration_files/configuration_file.yml"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"

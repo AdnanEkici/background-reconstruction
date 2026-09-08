@@ -1,0 +1,40 @@
+streamer_settings:
+  source: "test_videos/HighwayII.mp4"
+  display_window_name: BACKGROUND RECONSTRUCTION
+  enable_save: True
+
+background_subtractor_settings:
+  device: "cpu"
+  number_of_samples: 30
+  matching_threshold: 1
+  matching_number: 1
+  update_factor: 1
+  neighborhood_radius: 1
+  median_filter_kernel_size: 3
+  morphological_opening_structuring_element_size: 7
+
+
+background_reconstructor_settings:
+  method: sc_sobs_1
+
+  sc_sobs_neuron_grid_size: 3
+
+  sc_sobs_training_threshold: 1.0
+  sc_sobs_testing_threshold: 0.008
+
+  sc_sobs_training_learning_rate: 1.0
+  sc_sobs_testing_learning_rate: 0.05
+
+  sc_sobs_coherence_window_size: 5
+  sc_sobs_update_radius: 1
+  sc_sobs_gaussian_sigma: 1.0
+
+  sc_sobs_training_frames: 500
+
+  sc_sobs_ground_truth_path: "test_videos/groundtruths/GT_HighwayII.png"
+
+  sc_sobs_output_path: "output/sc_sobs_1_background.png"
+
+  age_threshold: 20
+  foreground_change_ratio: 0.01
+  background_change_ratio: 0.02

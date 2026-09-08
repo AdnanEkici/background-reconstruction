@@ -1,0 +1,29 @@
+streamer_settings:
+  source: "test_videos/HighwayII.mp4"
+  display_window_name: BACKGROUND RECONSTRUCTION
+  enable_save: True
+
+background_subtractor_settings:
+  device: "cpu"
+  number_of_samples: 30
+  matching_threshold: 1
+  matching_number: 1
+  update_factor: 1
+  neighborhood_radius: 1
+  median_filter_kernel_size: 3
+  morphological_opening_structuring_element_size: 7
+
+
+
+
+background_reconstructor_settings:
+  method: mog2  # no_ema | single_ema | dual_ema | mean | color_median | mog2
+
+  mog2_history: 500
+  mog2_var_threshold: 16.0
+  mog2_detect_shadows: false
+  mog2_learning_rate: -1.0
+
+  age_threshold: 20
+  foreground_change_ratio: 0.01
+  background_change_ratio: 0.02k

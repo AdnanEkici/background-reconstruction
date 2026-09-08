@@ -44,39 +44,6 @@ def read_yaml(yaml_file_path: str) -> dict:
         return data
 
 
-def iou(boxA, boxB):
-    """Compute the Intersection-over-Union (IoU) between two bounding boxes.
-
-    IoU is defined as the area of intersection divided by the area
-    of the union of the two bounding boxes.
-
-    Parameters
-    ----------
-    boxA : tuple[int, int, int, int]
-        Bounding box A in format ``(x, y, width, height)``.
-    boxB : tuple[int, int, int, int]
-        Bounding box B in format ``(x, y, width, height)``.
-
-    Returns
-    -------
-    float
-        Intersection-over-Union value in [0, 1].
-    """
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[0] + boxA[2], boxB[0] + boxB[2])
-    yB = min(boxA[1] + boxA[3], boxB[1] + boxB[3])
-
-    interW = max(0, xB - xA)
-    interH = max(0, yB - yA)
-    interArea = interW * interH
-
-    boxAArea = boxA[2] * boxA[3]
-    boxBArea = boxB[2] * boxB[3]
-    iou = interArea / float(boxAArea + boxBArea - interArea + 1e-5)
-    return iou
-
-
 def test_time_benchmark(func):
     """Decorator to benchmark function execution time.
 

@@ -1,144 +1,163 @@
+# background_reconstructor.py
 from __future__ import annotations
 
 from typing import Final
 
 import numpy as np
+from reconstructor.reconstruction_methods.background_reconstructor_color_median import (
+    BackgroundReconstructorColorMedian,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_dual_ema import (
+    BackgroundReconstructorDualEma,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_labgen import (
+    BackgroundReconstructorLaBGen,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_mean import (
+    BackgroundReconstructorMean,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_mog2 import (
+    BackgroundReconstructorMog2,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_no_ema import (
+    BackgroundReconstructorNoEma,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_sc_sobs_1 import (
+    BackgroundReconstructorScSobs1,
+)
+from reconstructor.reconstruction_methods.background_reconstructor_single_ema import (
+    BackgroundReconstructorSingleEma,
+)
 
 
 class BackgroundReconstructor:
-    """Reconstruct a clean background from a video stream using temporally stable pixels.
+    """Background reconstruction method dispatcher."""
 
-    This class tracks how long each pixel remains static and updates the background image
-    using a dual-rate exponential moving average (EMA). Pixels that remain static for a
-    configured threshold are considered reliable and contribute to background reconstruction.
+    MEAN: Final[str] = "mean"
+    COLOR_MEDIAN: Final[str] = "color_median"
+    MOG2: Final[str] = "mog2"
+    LABGEN: Final[str] = "labgen"
+    SC_SOBS_1: Final[str] = "sc_sobs_1"
 
-    Attributes
-    ----------
-    CHANNEL_COUNT : int
-        Number of image channels. Default is ``3`` (RGB).
-    __height : int
-        Frame height in pixels, derived from the sample frame.
-    __width : int
-        Frame width in pixels, derived from the sample frame.
-    __background : np.ndarray
-        Float32 background image updated incrementally.
-    __static_pixel_duration_map : np.ndarray
-        Map of static durations per pixel (uint8).
-    __static_mask : np.ndarray or None
-        Current reliability mask expanded to three channels, or ``None`` if unset.
-    __age_threshold : int
-        Number of frames a pixel must remain static to be considered reliable.
-    __background_change_ratio : float
-        EMA factor applied for long-term static pixels.
-    __foreground_change_ratio : float
-        EMA factor applied for newly static pixels.
-    """
+    NO_EMA: Final[str] = "no_ema"
+    SINGLE_EMA: Final[str] = "single_ema"
+    DUAL_EMA: Final[str] = "dual_ema"
 
-    CHANNEL_COUNT: Final[int] = 3
+    DEFAULT_METHOD: Final[str] = DUAL_EMA
 
-    def __init__(self, sample_frame: np.ndarray, background_reconstructor_settings: dict):
-        """Initialize the background reconstructor.
+    METHODS_WITH_FOREGROUND_MASK: Final[frozenset[str]] = frozenset(
+        {
+            LABGEN,
+            NO_EMA,
+            SINGLE_EMA,
+            DUAL_EMA,
+        },
+    )
 
-        Parameters
-        ----------
-        sample_frame : np.ndarray
-            Initial RGB frame used to set dimensions and initialize background storage.
-            Shape ``(H, W, 3)``.
-        background_reconstructor_settings : dict
-            Configuration dictionary with keys:
+    METHODS_WITHOUT_FOREGROUND_MASK: Final[frozenset[str]] = frozenset(
+        {
+            MEAN,
+            COLOR_MEDIAN,
+            MOG2,
+            SC_SOBS_1,
+        },
+    )
 
-            - ``"age_threshold"`` (int): Number of frames a pixel must remain static
-              to be considered reliable. Default is 5.
-            - ``"background_change_ratio"`` (float): EMA factor for long-term static pixels.
-              Default is 0.02.
-            - ``"foreground_change_ratio"`` (float): EMA factor for newly static pixels.
-              Default is 0.01.
-        """
+    METHODS_REQUIRING_FINALIZATION: Final[frozenset[str]] = frozenset(
+        {
+            COLOR_MEDIAN,
+            LABGEN,
+            SC_SOBS_1,
+        },
+    )
 
-        self.__height: int
-        self.__width: int
-        self.__height, self.__width, _ = sample_frame.shape
-        self.__background: np.ndarray = np.zeros_like(sample_frame, dtype=np.float32)
-        self.__static_pixel_duration_map: np.ndarray = np.zeros((self.__height, self.__width), dtype=np.uint8)
-
-        self.__static_mask: np.ndarray | None = None
-
-        self.__age_threshold: int = background_reconstructor_settings.get("age_threshold", 5)
-        self.__background_change_ratio: float = background_reconstructor_settings.get("background_change_ratio", 0.02)
-        self.__foreground_change_ratio: float = background_reconstructor_settings.get("foreground_change_ratio", 0.01)
-
-    def __call__(self, frame: np.ndarray, binary_mask: np.ndarray) -> np.ndarray:
-        """Process a frame and update the background image based on static pixel analysis.
-
-        Parameters
-        ----------
-        frame : np.ndarray
-            The current RGB frame. Shape ``(H, W, 3)``.
-        binary_mask : np.ndarray
-            Binary foreground mask where 0 = background and 255 = foreground. Shape ``(H, W)``.
-
-        Returns
-        -------
-        np.ndarray
-            The updated background image as a uint8 array. Shape ``(H, W, 3)``.
-        """
-        just_became_static = self.__get_reliable_static_mask(binary_mask)
-        reconstructed_background = self.__update_background(frame, just_became_static)
-        return reconstructed_background.astype(np.uint8)
-
-    def __get_reliable_static_mask(
+    def __init__(
         self,
-        binary_mask: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Identify pixels that have remained static for the threshold duration.
+        sample_frame: np.ndarray,
+        background_reconstructor_settings: dict,
+    ):
+        if sample_frame.ndim != 3 or sample_frame.shape[2] != 3:
+            raise ValueError(
+                "sample_frame must have shape (H, W, 3). " f"Got {sample_frame.shape}.",
+            )
 
-        Parameters
-        ----------
-        binary_mask : np.ndarray
-            Foreground mask indicating motion (255 = motion, 0 = static). Shape ``(H, W)``.
+        method: str = str(
+            background_reconstructor_settings.get(
+                "method",
+                self.DEFAULT_METHOD,
+            ),
+        ).lower()
 
-        Returns
-        -------
-        np.ndarray
-            Boolean mask where ``True`` indicates pixels that just became reliably static.
-            Shape ``(H, W)``.
-        """
+        reconstructors = {
+            self.MEAN: BackgroundReconstructorMean,
+            self.COLOR_MEDIAN: (BackgroundReconstructorColorMedian),
+            self.MOG2: BackgroundReconstructorMog2,
+            self.LABGEN: BackgroundReconstructorLaBGen,
+            self.SC_SOBS_1: BackgroundReconstructorScSobs1,
+            self.NO_EMA: BackgroundReconstructorNoEma,
+            self.SINGLE_EMA: (BackgroundReconstructorSingleEma),
+            self.DUAL_EMA: (BackgroundReconstructorDualEma),
+        }
 
-        is_static: np.ndarray = binary_mask == 0
-        pixels_just_became_reliable: np.ndarray = self.__static_pixel_duration_map == self.__age_threshold
+        if method not in reconstructors:
+            supported_methods: str = ", ".join(
+                reconstructors.keys(),
+            )
 
-        self.__static_pixel_duration_map[is_static] += 1
-        self.__static_pixel_duration_map[~is_static] = 0
+            raise ValueError(
+                f"Unsupported background reconstruction " f"method: {method!r}. " f"Supported methods are: " f"{supported_methods}.",
+            )
 
-        reliable_static: np.ndarray = (self.__static_pixel_duration_map >= self.__age_threshold).astype(np.float32)
-        self.__static_mask = np.repeat(reliable_static[:, :, None], self.CHANNEL_COUNT, axis=2)
-        pixels_just_became_reliable = self.__static_pixel_duration_map == self.__age_threshold
-        return pixels_just_became_reliable
+        reconstructor_class = reconstructors[method]
 
-    def __update_background(self, frame: np.ndarray, just_became_static: np.ndarray) -> np.ndarray:
-        """Update the background image using EMA where reliable pixels are detected.
+        self.__reconstructor = reconstructor_class(
+            sample_frame=sample_frame,
+            background_reconstructor_settings=(background_reconstructor_settings),
+        )
 
-        Parameters
-        ----------
-        frame : np.ndarray
-            The current RGB frame. Shape ``(H, W, 3)``.
-        just_became_static : np.ndarray
-            Boolean mask of pixels that just became reliably static. Shape ``(H, W)``.
+        self.__method: str = method
 
-        Returns
-        -------
-        np.ndarray
-            Updated background image in float32 format. Shape ``(H, W, 3)``.
-        """
-        reliable: np.ndarray = self.__static_mask[:, :, 0] == 1
-        alpha_map: np.ndarray = np.full((self.__height, self.__width), self.__background_change_ratio, dtype=np.float32)
-        alpha_map[just_became_static] = self.__foreground_change_ratio
+    def __call__(
+        self,
+        frame: np.ndarray,
+        binary_mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """Process one frame."""
 
-        for channel in range(self.CHANNEL_COUNT):
-            single_channel_background: np.ndarray = self.__background[:, :, channel]
-            current: np.ndarray = frame[:, :, channel].astype(np.float32)
-            single_channel_background[reliable] = (1 - alpha_map[reliable]) * single_channel_background[
-                reliable
-            ] + alpha_map[reliable] * current[reliable]
+        if self.requires_foreground_mask and binary_mask is None:
+            raise ValueError(
+                f"Reconstruction method " f"{self.__method!r} requires " f"a foreground binary mask.",
+            )
 
-        return self.__background
+        return self.__reconstructor(
+            frame=frame,
+            binary_mask=binary_mask,
+        )
+
+    @property
+    def method(self) -> str:
+        return self.__method
+
+    @property
+    def requires_foreground_mask(self) -> bool:
+        return self.__method in self.METHODS_WITH_FOREGROUND_MASK
+
+    @property
+    def requires_finalization(self) -> bool:
+        return self.__method in self.METHODS_REQUIRING_FINALIZATION
+
+    def finalize(self) -> np.ndarray:
+        """Finalize a batch/oracle reconstruction method."""
+
+        finalize_method = getattr(
+            self.__reconstructor,
+            "finalize",
+            None,
+        )
+
+        if finalize_method is None:
+            raise RuntimeError(
+                f"Reconstruction method " f"{self.__method!r} does not " f"require finalization.",
+            )
+
+        return finalize_method()
